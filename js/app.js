@@ -26,7 +26,8 @@ const state = {
   periodoDias: null,
   periodoCustom: null,
   editandoPessoaId: null,
-  editandoDefeitoId: null
+  editandoDefeitoId: null,
+  carregandoMensagens: false
 };
 
 // ---------- Utils ----------
@@ -92,23 +93,32 @@ async function carregarConversas() {
 
 async function carregarMensagens() {
   if (!state.conversaAtual) { state.mensagens = []; return; }
-  const todas = [];
+  const convId = state.conversaAtual.id;
+
+  const { count, error: errCount } = await supabase
+    .from('mensagens')
+    .select('*', { count: 'exact', head: true })
+    .eq('conversa_id', convId);
+  if (errCount) { console.error(errCount); state.mensagens = []; return; }
+  if (!count) { state.mensagens = []; return; }
+
   const PAGE = 1000;
-  let offset = 0;
-  while (true) {
-    const { data, error } = await supabase
-      .from('mensagens')
-      .select('*')
-      .eq('conversa_id', state.conversaAtual.id)
-      .order('enviada_em', { ascending: true })
-      .range(offset, offset + PAGE - 1);
-    if (error) { console.error(error); break; }
-    if (!data || data.length === 0) break;
-    todas.push(...data);
-    if (data.length < PAGE) break;
-    offset += PAGE;
+  const totalPages = Math.ceil(count / PAGE);
+  const promises = [];
+  for (let i = 0; i < totalPages; i++) {
+    const inicio = i * PAGE;
+    const fim = inicio + PAGE - 1;
+    promises.push(
+      supabase.from('mensagens')
+        .select('id, remetente_id, conteudo, enviada_em')
+        .eq('conversa_id', convId)
+        .order('enviada_em', { ascending: true })
+        .range(inicio, fim)
+        .then(r => r.data || [])
+    );
   }
-  state.mensagens = todas;
+  const chunks = await Promise.all(promises);
+  state.mensagens = chunks.flat();
 }
 
 async function carregarDefeitos() {
@@ -140,8 +150,72 @@ function renderHome() {
     return;
   }
 
+  if (state.carregandoMensagens) {
+    container.innerHTML = renderDashboardSkeleton();
+    return;
+  }
+
   container.innerHTML = renderDashboard();
   bindDashboardHandlers();
+}
+
+function renderDashboardSkeleton() {
+  const skBar = () => `
+    <div class="palavra">
+      <div class="palavra-head">
+        <span class="palavra-word"><div class="skeleton skeleton-line" style="width: 80px;"></div></span>
+        <div class="skeleton skeleton-line" style="width: 40px; margin: 0;"></div>
+      </div>
+      <div class="skeleton skeleton-bar"></div>
+    </div>`;
+
+  return `
+    <div class="chips">
+      <div class="chip skeleton" style="width: 50px; height: 28px; background: var(--surface);"></div>
+      <div class="chip skeleton" style="width: 60px; height: 28px; background: var(--surface);"></div>
+      <div class="chip skeleton" style="width: 60px; height: 28px; background: var(--surface);"></div>
+      <div class="chip skeleton" style="width: 50px; height: 28px; background: var(--surface);"></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Tempo médio de resposta
+        </div>
+      </div>
+      <div class="kpi-dual">
+        <div class="kpi-cell">
+          <div class="skeleton skeleton-line" style="width: 60px;"></div>
+          <div class="skeleton skeleton-value"></div>
+          <div class="skeleton skeleton-line" style="width: 50px; margin: 0;"></div>
+        </div>
+        <div class="kpi-cell">
+          <div class="skeleton skeleton-line" style="width: 60px;"></div>
+          <div class="skeleton skeleton-value"></div>
+          <div class="skeleton skeleton-line" style="width: 50px; margin: 0;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi-simple">
+        <div class="skeleton skeleton-line" style="width: 70%;"></div>
+        <div class="skeleton skeleton-value"></div>
+      </div>
+      <div class="kpi-simple">
+        <div class="skeleton skeleton-line" style="width: 70%;"></div>
+        <div class="skeleton skeleton-value"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+          Palavras mais usadas
+        </div>
+      </div>
+      ${skBar()}${skBar()}${skBar()}${skBar()}${skBar()}
+    </div>
+  `;
 }
 
 function renderSetup() {
@@ -685,6 +759,9 @@ function renderTopbar() {
   const el = $('#topbar-content');
   if (state.conversaAtual) {
     const c = state.conversaAtual;
+    const sub = state.carregandoMensagens
+      ? '<span class="spinner" style="width:12px;height:12px;display:inline-block;vertical-align:-2px;margin-right:6px;"></span>Sincronizando...'
+      : `${fmtNum(state.mensagens.length)} mensagens`;
     el.innerHTML = `
       <div class="pair">
         <div class="avatar a">${iniciais(c.pessoa_a.nome)}</div>
@@ -693,7 +770,7 @@ function renderTopbar() {
       </div>
       <div class="topbar-info">
         <div class="topbar-title">${c.pessoa_a.nome} × ${c.pessoa_b.nome}</div>
-        <div class="topbar-sub" title="${state.mensagens.length.toLocaleString('pt-BR')} mensagens">${fmtNum(state.mensagens.length)} mensagens</div>
+        <div class="topbar-sub" title="${state.mensagens.length.toLocaleString('pt-BR')} mensagens">${sub}</div>
       </div>
       <button class="icon-btn" id="btn-menu" aria-label="Menu">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
@@ -862,18 +939,30 @@ async function main() {
   state.user = await requireAuth('login.html');
   if (!state.user) return;
 
-  await carregarPerfil();
-  await carregarPessoas();
-  await carregarConversas();
-  await carregarMensagens();
-  await carregarDefeitos();
+  // Queries rápidas em paralelo
+  await Promise.all([
+    carregarPerfil(),
+    carregarPessoas(),
+    carregarConversas()
+  ]);
 
   renderTopbar();
+  state.carregandoMensagens = !!state.conversaAtual;
   switchView('home');
 
-  const minSplash = 400;
+  // Esconde splash assim que a UI tá renderizada
+  const minSplash = 300;
   const passou = Date.now() - inicio;
   setTimeout(esconderSplash, Math.max(0, minSplash - passou));
+
+  // Mensagens + defeitos em background (pesado — não bloqueia a UI)
+  Promise.all([carregarMensagens(), carregarDefeitos()]).then(() => {
+    state.carregandoMensagens = false;
+    renderTopbar();
+    if ($('#view-home').classList.contains('active')) renderHome();
+    if ($('#view-defeitos').classList.contains('active')) renderDefeitos();
+    if ($('#view-palavras').classList.contains('active')) renderPalavras();
+  });
 
   // Bottom nav
   $$('.nav-item').forEach(item => {
