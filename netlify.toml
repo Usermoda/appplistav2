@@ -1,0 +1,62 @@
+# ============================================================
+# Netlify — config de deploy
+# App 100% estático, nenhum build step necessário.
+# ============================================================
+
+[build]
+  publish = "."
+  command = ""
+
+# ---- SPA/multipage: 404 cai no index.html não é necessário aqui
+# pois temos múltiplos HTML (login/cadastro/index). Netlify serve
+# cada arquivo direto. Se quiser 404 custom, troque pra "/index.html".
+
+# ============================================================
+# HEADERS
+# ============================================================
+
+# Service worker: NUNCA cachear (precisa atualizar)
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+# Manifest: MIME type correto + cache curto
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
+    Cache-Control = "public, max-age=3600"
+
+# HTML: sempre revalidar
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# CSS/JS: cache 1 dia (o Service Worker cuida do resto)
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# SVG/ícones: cache 1 semana
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+# Segurança básica em tudo
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

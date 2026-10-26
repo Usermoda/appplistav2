@@ -24,7 +24,8 @@ const state = {
   mensagens: [],
   defeitos: [],
   periodoDias: null,
-  editandoPessoaId: null
+  editandoPessoaId: null,
+  editandoDefeitoId: null
 };
 
 // ---------- Utils ----------
@@ -400,8 +401,18 @@ function renderDefeitos() {
           <span class="defeito-date">${timeAgo(d.criado_em)}</span>
         </div>
       </div>
+      <div class="defeito-actions">
+        <button data-edit-defeito="${d.id}" aria-label="Editar">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button data-del-defeito="${d.id}" aria-label="Remover">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
     </div>
   `).join('');
+  $$('[data-edit-defeito]').forEach(b => b.onclick = () => abrirEdicaoDefeito(b.dataset.editDefeito));
+  $$('[data-del-defeito]').forEach(b => b.onclick = () => deletarDefeito(b.dataset.delDefeito));
 }
 
 // ---------- Render: PALAVRAS ----------
@@ -559,17 +570,54 @@ async function importarArquivo(file, pessoaAId, pessoaBId) {
   await recarregarTudo();
 }
 
-async function criarDefeito(titulo, descricao, severidade) {
+async function criarDefeito(titulo, descricao, severidade, status) {
   if (!state.conversaAtual) { alert('Nenhuma conversa ativa'); return; }
   const { data, error } = await supabase.from('defeitos').insert({
     conversa_id: state.conversaAtual.id,
-    titulo, descricao: descricao || null, severidade,
+    titulo, descricao: descricao || null, severidade, status,
     criado_por: state.user.id
   }).select().single();
   if (error) { alert(error.message); return; }
   state.defeitos.unshift(data);
+}
+
+async function atualizarDefeito(id, titulo, descricao, severidade, status) {
+  const update = { titulo, descricao: descricao || null, severidade, status };
+  if (status === 'resolvido') update.resolvido_em = new Date().toISOString();
+  else update.resolvido_em = null;
+  const { data, error } = await supabase.from('defeitos')
+    .update(update).eq('id', id).select().single();
+  if (error) { alert('Erro: ' + error.message); return; }
+  const idx = state.defeitos.findIndex(d => d.id === id);
+  if (idx >= 0) state.defeitos[idx] = data;
+}
+
+async function deletarDefeito(id) {
+  if (!confirm('Remover esse defeito?')) return;
+  const { error } = await supabase.from('defeitos').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  state.defeitos = state.defeitos.filter(d => d.id !== id);
   renderDefeitos();
-  closeModal('#modal-defeito');
+}
+
+function abrirEdicaoDefeito(id) {
+  const d = state.defeitos.find(x => x.id === id);
+  if (!d) return;
+  state.editandoDefeitoId = id;
+  const form = $('#form-defeito');
+  form.titulo.value = d.titulo || '';
+  form.descricao.value = d.descricao || '';
+  form.severidade.value = d.severidade || 'media';
+  form.status.value = d.status || 'aberto';
+  $('#modal-defeito-title').textContent = 'Editar defeito';
+  openModal('#modal-defeito');
+}
+
+function resetModalDefeito() {
+  const form = $('#form-defeito');
+  form.reset();
+  state.editandoDefeitoId = null;
+  $('#modal-defeito-title').textContent = 'Novo defeito';
 }
 
 // ---------- Topbar / nome usuario ----------
@@ -708,11 +756,22 @@ function bindModalDefeito() {
     const titulo = form.titulo.value.trim();
     const descricao = form.descricao.value.trim();
     const severidade = form.severidade.value;
+    const status = form.status.value;
     if (!titulo) return;
-    await criarDefeito(titulo, descricao, severidade);
-    form.reset();
+    if (state.editandoDefeitoId) {
+      await atualizarDefeito(state.editandoDefeitoId, titulo, descricao, severidade, status);
+    } else {
+      await criarDefeito(titulo, descricao, severidade, status);
+    }
+    closeModal('#modal-defeito');
+    resetModalDefeito();
+    renderHome();
+    renderDefeitos();
   };
-  $('#modal-defeito [data-close]').onclick = () => closeModal('#modal-defeito');
+  $('#modal-defeito [data-close]').onclick = () => {
+    closeModal('#modal-defeito');
+    resetModalDefeito();
+  };
 }
 
 // Observer para abrir modal importar com pessoas atualizadas
@@ -726,9 +785,18 @@ const observer = new MutationObserver(() => {
   }
 });
 
+// ---------- Splash ----------
+function esconderSplash() {
+  const s = $('#splash');
+  if (!s) return;
+  s.classList.add('hidden');
+  setTimeout(() => s.remove(), 400);
+}
+
 // ---------- Bootstrap ----------
 async function main() {
   registerPwa();
+  const inicio = Date.now();
   state.user = await requireAuth('login.html');
   if (!state.user) return;
 
@@ -741,6 +809,10 @@ async function main() {
   renderTopbar();
   switchView('home');
 
+  const minSplash = 400;
+  const passou = Date.now() - inicio;
+  setTimeout(esconderSplash, Math.max(0, minSplash - passou));
+
   // Bottom nav
   $$('.nav-item').forEach(item => {
     item.onclick = () => switchView(item.dataset.view);
@@ -750,8 +822,9 @@ async function main() {
   $('#fab').onclick = () => {
     const v = document.querySelector('.view.active').id;
     if (v === 'view-pessoas') { resetModalPessoa(); return openModal('#modal-pessoa'); }
-    if (v === 'view-defeitos') return openModal('#modal-defeito');
+    if (v === 'view-defeitos') { resetModalDefeito(); return openModal('#modal-defeito'); }
     if (!state.conversaAtual) { resetModalPessoa(); return openModal('#modal-pessoa'); }
+    resetModalDefeito();
     openModal('#modal-defeito');
   };
 

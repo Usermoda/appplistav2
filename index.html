@@ -72,6 +72,13 @@
   </style>
 </head>
 <body>
+  <!-- SPLASH -->
+  <div class="splash" id="splash">
+    <img src="icon.svg" alt="App Lista" class="splash-icon" />
+    <div class="splash-spinner"></div>
+    <div class="splash-text">Carregando...</div>
+  </div>
+
   <div class="container">
     <!-- TOPBAR -->
     <header class="topbar" id="topbar-content">
@@ -251,11 +258,11 @@
     </div>
   </div>
 
-  <!-- ============ MODAL: NOVO DEFEITO ============ -->
+  <!-- ============ MODAL: NOVO/EDITAR DEFEITO ============ -->
   <div class="modal" id="modal-defeito">
     <div class="modal-sheet">
       <div class="modal-head">
-        <div class="modal-title">Novo defeito</div>
+        <div class="modal-title" id="modal-defeito-title">Novo defeito</div>
         <button class="modal-close" data-close>
           <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -277,6 +284,14 @@
             <option value="media" selected>Média</option>
             <option value="alta">Alta</option>
             <option value="critica">Crítica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="input" name="status" required>
+            <option value="aberto" selected>Aberto</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="resolvido">Resolvido</option>
           </select>
         </div>
         <button type="submit" class="btn btn-primary">

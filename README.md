@@ -8,7 +8,7 @@ App mobile (PWA) para analisar conversas entre duas pessoas de uma empresa a par
 - Supabase (Auth + Postgres + REST)
 - PWA (service worker + manifest)
 
-## Como rodar
+## Como rodar (local)
 
 1. Siga **`SUPABASE_SETUP.md`** pra criar sua conta e projeto Supabase (passo a passo).
 2. Rode **`supabase/schema.sql`** no SQL Editor do Supabase.
@@ -16,6 +16,11 @@ App mobile (PWA) para analisar conversas entre duas pessoas de uma empresa a par
 4. No VS Code, instale a extensão **Live Server**.
 5. Abra **`login.html`** com Live Server.
 6. Cadastre uma conta, adicione 2 pessoas, importe seu `.txt`.
+
+## Deploy (produção)
+
+Guia completo passo a passo em **`DEPLOY.md`** — deploy no Netlify em ~3 minutos via GitHub.
+Cada push na `main` dispara um deploy automático.
 
 ## Estrutura
 

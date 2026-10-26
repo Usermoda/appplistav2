@@ -217,6 +217,16 @@ button { font-family: inherit; cursor: pointer; }
 
 .defeito-date { color: var(--text-dim); font-size: 10px; margin-left: auto; }
 
+.defeito-actions { display: flex; gap: 4px; flex-shrink: 0; align-self: start; }
+.defeito-actions button {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: grid; place-items: center;
+  color: var(--text-dim);
+}
+.defeito-actions button:hover { color: var(--text); background: var(--surface-3); }
+.defeito-actions svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
 /* ==========================================================
    Palavras
    ========================================================== */
@@ -393,3 +403,40 @@ button { font-family: inherit; cursor: pointer; }
    ========================================================== */
 .view { display: none; }
 .view.active { display: block; }
+
+/* ==========================================================
+   Splash
+   ========================================================== */
+.splash {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  z-index: 100;
+  transition: opacity .3s ease;
+}
+.splash.hidden { opacity: 0; pointer-events: none; }
+.splash-icon {
+  width: 96px; height: 96px;
+  border-radius: 22px;
+  animation: splash-pulse 1.6s ease-in-out infinite;
+}
+.splash-spinner {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid var(--surface-2);
+  border-top-color: var(--accent);
+  animation: spin .8s linear infinite;
+}
+.splash-text {
+  color: var(--text-dim);
+  font-size: 13px;
+  letter-spacing: .3px;
+}
+@keyframes splash-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.96); opacity: .85; }
+}

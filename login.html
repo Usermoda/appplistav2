@@ -11,6 +11,12 @@
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+  <div class="splash" id="splash">
+    <img src="icon.svg" alt="App Lista" class="splash-icon" />
+    <div class="splash-spinner"></div>
+    <div class="splash-text">Carregando...</div>
+  </div>
+
   <main class="auth-wrap">
     <div class="auth-logo">
       <div class="auth-logo-badge">
@@ -55,7 +61,10 @@
 
     // Se já estiver logado, pula pro app
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) window.location.href = 'index.html';
+    if (session) { window.location.href = 'index.html'; } else {
+      const s = document.getElementById('splash');
+      if (s) { s.classList.add('hidden'); setTimeout(() => s.remove(), 400); }
+    }
 
     initLogin();
   </script>
