@@ -27,7 +27,9 @@ const state = {
   periodoCustom: null,
   editandoPessoaId: null,
   editandoDefeitoId: null,
-  carregandoMensagens: false
+  carregandoMensagens: false,
+  defeitoFiltroStatus: 'todos',
+  defeitoBusca: ''
 };
 
 // ---------- Utils ----------
@@ -511,40 +513,112 @@ function renderEmptyPessoas() {
 
 // ---------- Render: DEFEITOS ----------
 function renderDefeitos() {
-  const list = $('#defeitos-list');
-  if (!state.defeitos.length) {
-    list.innerHTML = `
-      <div class="empty">
-        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M9 13l2 2 4-4"/></svg>
-        <div class="empty-title">Sem defeitos</div>
-        <div class="empty-text">Registre problemas de comunicação encontrados</div>
+  const container = $('#defeitos-container');
+  const todos = state.defeitos;
+  const contagem = {
+    todos: todos.length,
+    aberto: todos.filter(d => d.status === 'aberto').length,
+    em_andamento: todos.filter(d => d.status === 'em_andamento').length,
+    resolvido: todos.filter(d => d.status === 'resolvido').length
+  };
+
+  const filtroStatus = state.defeitoFiltroStatus;
+  const busca = state.defeitoBusca.trim().toLowerCase();
+  let lista = todos;
+  if (filtroStatus !== 'todos') lista = lista.filter(d => d.status === filtroStatus);
+  if (busca) {
+    lista = lista.filter(d =>
+      (d.titulo || '').toLowerCase().includes(busca) ||
+      (d.descricao || '').toLowerCase().includes(busca)
+    );
+  }
+
+  const sevLabel = { baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica' };
+  const stLabel = { aberto: 'aberto', em_andamento: 'em andamento', resolvido: 'resolvido' };
+
+  if (!todos.length) {
+    container.innerHTML = `
+      <div class="card">
+        <div class="empty">
+          <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M9 13l2 2 4-4"/></svg>
+          <div class="empty-title">Sem defeitos</div>
+          <div class="empty-text">Toque no + pra registrar o primeiro</div>
+        </div>
       </div>
     `;
     return;
   }
-  list.innerHTML = state.defeitos.map(d => `
-    <div class="defeito">
-      <div class="defeito-icon ${d.severidade === 'critica' ? 'alta' : d.severidade}">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      </div>
-      <div class="defeito-body">
-        <div class="defeito-title">${d.titulo}</div>
-        <div class="defeito-desc">${d.descricao || '—'}</div>
-        <div class="defeito-meta">
-          <span class="badge st-${d.status === 'em_andamento' ? 'andamento' : d.status}">${d.status.replace('_', ' ')}</span>
-          <span class="defeito-date">${timeAgo(d.criado_em)}</span>
-        </div>
-      </div>
-      <div class="defeito-actions">
-        <button data-edit-defeito="${d.id}" aria-label="Editar">
-          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button data-del-defeito="${d.id}" aria-label="Remover">
-          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
-        </button>
-      </div>
+
+  container.innerHTML = `
+    <div class="chips">
+      <button class="chip ${filtroStatus === 'todos' ? 'active' : ''}" data-f-status="todos">
+        Todos <span class="chip-count">${contagem.todos}</span>
+      </button>
+      <button class="chip ${filtroStatus === 'aberto' ? 'active' : ''}" data-f-status="aberto">
+        Abertos <span class="chip-count">${contagem.aberto}</span>
+      </button>
+      <button class="chip ${filtroStatus === 'em_andamento' ? 'active' : ''}" data-f-status="em_andamento">
+        Andamento <span class="chip-count">${contagem.em_andamento}</span>
+      </button>
+      <button class="chip ${filtroStatus === 'resolvido' ? 'active' : ''}" data-f-status="resolvido">
+        Resolvidos <span class="chip-count">${contagem.resolvido}</span>
+      </button>
     </div>
-  `).join('');
+
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" class="search-input" id="def-search" placeholder="Buscar defeito..." value="${state.defeitoBusca.replace(/"/g, '&quot;')}" />
+      ${busca ? '<button class="search-clear" id="def-search-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' : ''}
+    </div>
+
+    <div class="card">
+      ${lista.length === 0 ? `
+        <div class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <div class="empty-title">Nada encontrado</div>
+          <div class="empty-text">${busca ? 'Nenhum defeito corresponde à busca' : 'Nenhum defeito nessa categoria'}</div>
+        </div>
+      ` : lista.map(d => `
+        <div class="defeito">
+          <div class="defeito-icon ${d.severidade === 'critica' ? 'alta' : d.severidade}">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="defeito-body">
+            <div class="defeito-title">${d.titulo}</div>
+            ${d.descricao ? `<div class="defeito-desc">${d.descricao}</div>` : ''}
+            <div class="defeito-meta">
+              <span class="badge sev-${d.severidade === 'critica' ? 'alta' : d.severidade}">${sevLabel[d.severidade] || d.severidade}</span>
+              <span class="badge st-${d.status === 'em_andamento' ? 'andamento' : d.status}">${stLabel[d.status] || d.status}</span>
+              <span class="defeito-date">${timeAgo(d.criado_em)}</span>
+            </div>
+          </div>
+          <div class="defeito-actions">
+            <button data-edit-defeito="${d.id}" aria-label="Editar">
+              <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button data-del-defeito="${d.id}" aria-label="Remover">
+              <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+            </button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  $$('[data-f-status]').forEach(b => b.onclick = () => {
+    state.defeitoFiltroStatus = b.dataset.fStatus;
+    renderDefeitos();
+  });
+  const input = $('#def-search');
+  if (input) {
+    input.oninput = (e) => { state.defeitoBusca = e.target.value; renderDefeitos(); input.focus(); };
+    if (busca) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }
+  const clear = $('#def-search-clear');
+  if (clear) clear.onclick = () => { state.defeitoBusca = ''; renderDefeitos(); };
   $$('[data-edit-defeito]').forEach(b => b.onclick = () => abrirEdicaoDefeito(b.dataset.editDefeito));
   $$('[data-del-defeito]').forEach(b => b.onclick = () => deletarDefeito(b.dataset.delDefeito));
 }
