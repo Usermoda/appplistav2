@@ -1,0 +1,28 @@
+{
+  "name": "App Lista — Análise de Conversas",
+  "short_name": "App Lista",
+  "description": "Analise conversas entre duas pessoas: tempo de resposta, palavras mais usadas e defeitos de comunicação.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0f1419",
+  "background_color": "#0f1419",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

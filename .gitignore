@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies / cache
+node_modules/
+.cache/
+
+# Env (apenas chaves REALMENTE secretas — a anon/publishable do Supabase pode ir pro repo)
+.env
+.env.local
+*.secret
+
+# Build artifacts
+dist/
+build/

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1419" />
+  <title>App Lista</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* ===== Modal ===== */
+    .modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 50;
+    }
+    .modal.open { display: flex; animation: fade .2s; }
+    .modal-sheet {
+      background: var(--bg);
+      border-radius: 20px 20px 0 0;
+      padding: 20px 20px calc(28px + env(safe-area-inset-bottom, 0));
+      width: 100%;
+      max-width: 480px;
+      border-top: 1px solid var(--border);
+      animation: slide-up .3s;
+    }
+    .modal-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal-title { font-size: 17px; font-weight: 700; }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--surface);
+      border: none; color: var(--text);
+      display: grid; place-items: center;
+    }
+    .modal-close svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    @keyframes fade { from { opacity: 0; } }
+    @keyframes slide-up { from { transform: translateY(100%); } }
+
+    /* Color picker */
+    .color-row { display: flex; gap: 8px; }
+    .color-swatch {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid transparent; cursor: pointer;
+    }
+    .color-swatch.selected { border-color: var(--text); }
+    input[type="radio"].color-input { display: none; }
+
+    /* File input */
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .file-drop:hover { border-color: var(--accent); color: var(--text); }
+    .file-drop svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-bottom: 8px; }
+    .file-drop input { display: none; }
+    .file-selected { color: var(--accent); font-weight: 600; }
+
+    select.input { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- TOPBAR -->
+    <header class="topbar" id="topbar-content">
+      <div class="topbar-info">
+        <div class="topbar-title">Carregando...</div>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="content">
+      <!-- VIEW: HOME (dashboard ou setup) -->
+      <section class="view active" id="view-home">
+        <div id="home-content"></div>
+      </section>
+
+      <!-- VIEW: DEFEITOS -->
+      <section class="view" id="view-defeitos">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M8 2v4M16 2v4"/><path d="M9 13l2 2 4-4"/></svg>
+              Defeitos
+            </div>
+          </div>
+          <div id="defeitos-list"></div>
+        </div>
+      </section>
+
+      <!-- VIEW: PALAVRAS -->
+      <section class="view" id="view-palavras">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+              Top 50 palavras
+            </div>
+          </div>
+          <div id="palavras-list"></div>
+        </div>
+      </section>
+
+      <!-- VIEW: PESSOAS -->
+      <section class="view" id="view-pessoas">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/></svg>
+              Pessoas
+            </div>
+            <button class="card-link" id="btn-nova-pessoa">+ adicionar</button>
+          </div>
+          <div id="pessoas-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- FAB -->
+    <button class="fab" id="fab" aria-label="Novo">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottomnav">
+      <button class="nav-item active" data-view="home">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-view="defeitos">
+        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M8 2v4M16 2v4"/><path d="M9 13l2 2 4-4"/></svg>
+        <span>Defeitos</span>
+      </button>
+      <button class="nav-item" data-view="palavras">
+        <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        <span>Palavras</span>
+      </button>
+      <button class="nav-item" data-view="pessoas">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/></svg>
+        <span>Pessoas</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ============ MODAL: MENU ============ -->
+  <div class="modal" id="modal-menu">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Menu</div>
+        <button class="modal-close" data-close>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <button class="btn btn-primary" id="btn-install" hidden>
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Instalar app
+      </button>
+      <button class="btn" id="btn-logout" style="background: var(--surface); color: var(--text); margin-top: 8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sair
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: NOVA PESSOA ============ -->
+  <div class="modal" id="modal-pessoa">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title" id="modal-pessoa-title">Nova pessoa</div>
+        <button class="modal-close" data-close>
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <form id="form-pessoa">
+        <div class="form-group">
+          <label>Nome</label>
+          <input class="input" type="text" name="nome" required placeholder="Ex: Maria Alves" />
+        </div>
+        <div class="form-group">
+          <label>Cargo (opcional)</label>
+          <input class="input" type="text" name="cargo" placeholder="Ex: Vendas" />
+        </div>
+        <div class="form-group">
+          <label>Cor</label>
+          <div class="color-row">
+            <label><input type="radio" name="cor" value="#58a6ff" class="color-input" checked /><span class="color-swatch selected" style="background:#58a6ff"></span></label>
+            <label><input type="radio" name="cor" value="#d29922" class="color-input" /><span class="color-swatch" style="background:#d29922"></span></label>
+            <label><input type="radio" name="cor" value="#f778ba" class="color-input" /><span class="color-swatch" style="background:#f778ba"></span></label>
+            <label><input type="radio" name="cor" value="#a371f7" class="color-input" /><span class="color-swatch" style="background:#a371f7"></span></label>
+            <label><input type="radio" name="cor" value="#39d0d8" class="color-input" /><span class="color-swatch" style="background:#39d0d8"></span></label>
+            <label><input type="radio" name="cor" value="#ff8c42" class="color-input" /><span class="color-swatch" style="background:#ff8c42"></span></label>
+            <label><input type="radio" name="cor" value="#25d366" class="color-input" /><span class="color-swatch" style="background:#25d366"></span></label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          Salvar
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: IMPORTAR TXT ============ -->
+  <div class="modal" id="modal-importar">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Importar conversa</div>
+        <button class="modal-close" data-close>
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <form id="form-importar">
+        <div class="form-group">
+          <label>Pessoa A</label>
+          <select class="input" name="pessoa_a" required></select>
+        </div>
+        <div class="form-group">
+          <label>Pessoa B</label>
+          <select class="input" name="pessoa_b" required></select>
+        </div>
+        <div class="form-group">
+          <label>Arquivo .txt do WhatsApp</label>
+          <label class="file-drop">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div id="file-label">Toque pra escolher o arquivo</div>
+            <input type="file" name="arquivo" accept=".txt" required />
+          </label>
+        </div>
+        <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
+          No WhatsApp: abra a conversa → opções → <strong>Exportar conversa</strong> → <strong>Sem mídia</strong> → salve o .txt.
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importar
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: NOVO DEFEITO ============ -->
+  <div class="modal" id="modal-defeito">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Novo defeito</div>
+        <button class="modal-close" data-close>
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <form id="form-defeito">
+        <div class="form-group">
+          <label>Título</label>
+          <input class="input" type="text" name="titulo" required placeholder="Ex: Pergunta ignorada" />
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <input class="input" type="text" name="descricao" placeholder="Detalhes do problema" />
+        </div>
+        <div class="form-group">
+          <label>Severidade</label>
+          <select class="input" name="severidade" required>
+            <option value="baixa">Baixa</option>
+            <option value="media" selected>Média</option>
+            <option value="alta">Alta</option>
+            <option value="critica">Crítica</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          Salvar defeito
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+  <script>
+    // Color swatch picker
+    document.querySelectorAll('input[name="cor"]').forEach(input => {
+      input.addEventListener('change', () => {
+        document.querySelectorAll('#modal-pessoa .color-swatch').forEach(s => s.classList.remove('selected'));
+        input.nextElementSibling.classList.add('selected');
+      });
+    });
+    // File input label
+    document.querySelector('#form-importar input[type="file"]').addEventListener('change', (e) => {
+      const label = document.getElementById('file-label');
+      const f = e.target.files[0];
+      if (f) { label.textContent = f.name; label.className = 'file-selected'; }
+    });
+  </script>
+</body>
+</html>
