@@ -1,7 +1,7 @@
 // ============================================================
 // Service Worker — cache de assets estáticos (stale-while-revalidate)
 // ============================================================
-const CACHE = 'app-lista-v1';
+const CACHE = 'app-lista-v2';
 
 const PRECACHE = [
   './',

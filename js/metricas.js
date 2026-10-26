@@ -9,10 +9,30 @@ const STOPWORDS = new Set([
   'sim','não','nao','ok','oi','olá','ola','aí','ai','tá','ta','né','ne','pra','pro','já','ja','só','so','vc','voce','você',
   'q','p','pq','porque','então','entao','isso','isto','esse','essa','este','esta','aquele','aquela','la','lá',
   'bem','muito','muita','muitos','muitas','sem','até','ate','ou','também','tambem','vai','iria','era',
-  'midia','mídia','oculta','media','omitted'
+  'midia','mídia','oculta','media','omitted','editada','apagada','edited','deleted'
 ]);
 
 const MIDIA_PATTERN = /<\s*(m[íi]dia oculta|media omitted|arquivo anexado|audio omitted|image omitted|video omitted|sticker omitted|imagem oculta|v[íi]deo oculto|[áa]udio oculto|figurinha oculta|gif omitido)\s*>/i;
+
+// Marcadores que o WhatsApp injeta nas mensagens (edição, deleção)
+const META_PATTERNS = [
+  /<\s*esta mensagem foi editada\s*>/gi,
+  /<\s*mensagem editada\s*>/gi,
+  /<\s*esta mensagem foi apagada\s*>/gi,
+  /<\s*mensagem apagada\s*>/gi,
+  /<\s*editada\s*>/gi,
+  /\(editada\)/gi,
+  /voc[êe] apagou esta mensagem\.?/gi,
+  /esta mensagem foi apagada\.?/gi,
+  /this message was edited/gi,
+  /<\s*this message was deleted\s*>/gi,
+];
+
+export function limparConteudo(c) {
+  let r = c;
+  for (const p of META_PATTERNS) r = r.replace(p, ' ');
+  return r.replace(/\s+/g, ' ').trim();
+}
 
 export function isMidia(conteudo) {
   const limpo = conteudo.trim();
@@ -106,7 +126,9 @@ export function rankingPalavras(mensagens, pessoaAId, pessoaBId, topN = 20) {
   const contagem = {};
   for (const m of mensagens) {
     if (isMidia(m.conteudo)) continue;
-    const palavras = m.conteudo.split(/\s+/)
+    const texto = limparConteudo(m.conteudo);
+    if (!texto) continue;
+    const palavras = texto.split(/\s+/)
       .map(normalizarPalavra)
       .filter(p => p)
       .map(normalizarVariacoes)
