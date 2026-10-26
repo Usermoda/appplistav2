@@ -124,6 +124,16 @@ export function rankingPalavras(mensagens, pessoaAId, pessoaBId, topN = 20) {
     .slice(0, topN);
 }
 
+export function filtrarPorRange(mensagens, inicio, fim) {
+  if (!inicio || !fim) return mensagens;
+  const i = new Date(inicio); i.setHours(0, 0, 0, 0);
+  const f = new Date(fim); f.setHours(23, 59, 59, 999);
+  return mensagens.filter(m => {
+    const d = new Date(m.enviada_em);
+    return d >= i && d <= f;
+  });
+}
+
 export function filtrarPorPeriodo(mensagens, dias, refDate = null) {
   if (!dias) return mensagens;
   const ref = refDate ? new Date(refDate) : new Date();

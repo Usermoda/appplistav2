@@ -8,9 +8,9 @@ import { parseWhatsAppTxt, readFileAsText } from './importar.js';
 import {
   tempoMedioRespostaPorPessoa,
   formatarTempo,
-  volumePorDia,
   rankingPalavras,
   filtrarPorPeriodo,
+  filtrarPorRange,
   dataMaisRecente
 } from './metricas.js';
 
@@ -24,6 +24,7 @@ const state = {
   mensagens: [],
   defeitos: [],
   periodoDias: null,
+  periodoCustom: null,
   editandoPessoaId: null,
   editandoDefeitoId: null
 };
@@ -205,19 +206,21 @@ function bindSetupHandlers() {
 function renderDashboard() {
   const c = state.conversaAtual;
   const refDate = dataMaisRecente(state.mensagens);
-  const mensagens = filtrarPorPeriodo(state.mensagens, state.periodoDias, refDate);
+  let mensagens;
+  if (state.periodoCustom) {
+    mensagens = filtrarPorRange(state.mensagens, state.periodoCustom.inicio, state.periodoCustom.fim);
+  } else {
+    mensagens = filtrarPorPeriodo(state.mensagens, state.periodoDias, refDate);
+  }
   const tempos = tempoMedioRespostaPorPessoa(mensagens, c.pessoa_a_id, c.pessoa_b_id);
-  const vol = volumePorDia(mensagens, 7, refDate);
-  const maxVol = Math.max(...vol.map(v => v.total), 1);
   const palavras = rankingPalavras(mensagens, c.pessoa_a_id, c.pessoa_b_id, 5);
   const defeitosAbertos = state.defeitos.filter(d => d.status !== 'resolvido').length;
   const maxPal = palavras[0]?.total || 1;
-  const legendaVol = refDate
-    ? `Volume (últimos 7 dias até ${refDate.toLocaleDateString('pt-BR')})`
-    : 'Volume (últimos 7 dias)';
 
   let infoPeriodo = '';
-  if (state.periodoDias && refDate) {
+  if (state.periodoCustom) {
+    infoPeriodo = `${new Date(state.periodoCustom.inicio).toLocaleDateString('pt-BR')} — ${new Date(state.periodoCustom.fim).toLocaleDateString('pt-BR')}`;
+  } else if (state.periodoDias && refDate) {
     const inicio = new Date(refDate);
     inicio.setDate(inicio.getDate() - (state.periodoDias - 1));
     infoPeriodo = `${inicio.toLocaleDateString('pt-BR')} — ${refDate.toLocaleDateString('pt-BR')}`;
@@ -226,12 +229,33 @@ function renderDashboard() {
     infoPeriodo = `${primeira.toLocaleDateString('pt-BR')} — ${refDate.toLocaleDateString('pt-BR')}`;
   }
 
+  const banner = (pwa.canShowInstall() && !pwa.wasDismissed()) ? `
+    <div class="install-banner">
+      <div class="install-banner-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div class="install-banner-body">
+        <div class="install-banner-title">Instalar o app</div>
+        <div class="install-banner-text">Acesso rápido pela tela inicial, sem navegador</div>
+      </div>
+      <div class="install-banner-actions">
+        <button class="install-banner-btn" data-install>Instalar</button>
+        <button class="install-banner-dismiss" data-dismiss-install>agora não</button>
+      </div>
+    </div>
+  ` : '';
+
   return `
+    ${banner}
     <div class="chips">
-      <button class="chip ${state.periodoDias === 1 ? 'active' : ''}" data-periodo="1">Hoje</button>
-      <button class="chip ${state.periodoDias === 7 ? 'active' : ''}" data-periodo="7">7 dias</button>
-      <button class="chip ${state.periodoDias === 30 ? 'active' : ''}" data-periodo="30">30 dias</button>
-      <button class="chip ${state.periodoDias === null ? 'active' : ''}" data-periodo="">Tudo</button>
+      <button class="chip ${!state.periodoCustom && state.periodoDias === 1 ? 'active' : ''}" data-periodo="1">Hoje</button>
+      <button class="chip ${!state.periodoCustom && state.periodoDias === 7 ? 'active' : ''}" data-periodo="7">7 dias</button>
+      <button class="chip ${!state.periodoCustom && state.periodoDias === 30 ? 'active' : ''}" data-periodo="30">30 dias</button>
+      <button class="chip ${!state.periodoCustom && state.periodoDias === null ? 'active' : ''}" data-periodo="">Tudo</button>
+      <button class="chip ${state.periodoCustom ? 'active' : ''}" data-periodo-custom>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 2px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Personalizado
+      </button>
     </div>
     ${infoPeriodo ? `<div style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px; margin-top: -8px; margin-left: 4px;">${infoPeriodo} · ${fmtNum(mensagens.length)} mensagens</div>` : ''}
 
@@ -282,21 +306,6 @@ function renderDashboard() {
     <div class="card">
       <div class="card-head">
         <div class="card-title">
-          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          ${legendaVol}
-        </div>
-      </div>
-      <div class="chart">
-        ${vol.map(v => `<div class="chart-bar"><div class="fill" style="height: ${(v.total / maxVol) * 100}%"></div></div>`).join('')}
-      </div>
-      <div class="chart-labels">
-        ${vol.map(v => `<span>${new Date(v.data).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}</span>`).join('')}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-title">
           <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
           Palavras mais usadas
         </div>
@@ -335,11 +344,62 @@ function renderDashboard() {
 function bindDashboardHandlers() {
   $$('[data-periodo]').forEach(btn => {
     btn.onclick = () => {
+      state.periodoCustom = null;
       state.periodoDias = btn.dataset.periodo ? parseInt(btn.dataset.periodo, 10) : null;
       renderHome();
     };
   });
+  const customBtn = $('[data-periodo-custom]');
+  if (customBtn) customBtn.onclick = () => abrirModalPeriodo();
   $$('[data-nav]').forEach(btn => btn.onclick = () => switchView(btn.dataset.nav));
+
+  const installBtn = $('[data-install]');
+  if (installBtn) installBtn.onclick = async () => {
+    if (pwa.isIOS && !pwa.isInstallable()) {
+      openModal('#modal-ios-install');
+    } else {
+      await pwa.install();
+      renderHome();
+    }
+  };
+  const dismissBtn = $('[data-dismiss-install]');
+  if (dismissBtn) dismissBtn.onclick = () => { pwa.dismiss(); renderHome(); };
+}
+
+function abrirModalPeriodo() {
+  const form = $('#form-periodo');
+  const refDate = dataMaisRecente(state.mensagens) || new Date();
+  const iso = (d) => new Date(d).toISOString().slice(0, 10);
+  if (state.periodoCustom) {
+    form.inicio.value = iso(state.periodoCustom.inicio);
+    form.fim.value = iso(state.periodoCustom.fim);
+  } else {
+    const seteAtras = new Date(refDate);
+    seteAtras.setDate(seteAtras.getDate() - 6);
+    form.inicio.value = iso(seteAtras);
+    form.fim.value = iso(refDate);
+  }
+  openModal('#modal-periodo');
+}
+
+function bindModalPeriodo() {
+  const form = $('#form-periodo');
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const inicio = form.inicio.value;
+    const fim = form.fim.value;
+    if (!inicio || !fim) return;
+    if (new Date(inicio) > new Date(fim)) {
+      alert('Data inicial não pode ser depois da data final.');
+      return;
+    }
+    state.periodoCustom = { inicio, fim };
+    state.periodoDias = null;
+    closeModal('#modal-periodo');
+    renderHome();
+  };
+  $('#modal-periodo [data-close]').onclick = () => closeModal('#modal-periodo');
+  $('#modal-ios-install [data-close]').onclick = () => closeModal('#modal-ios-install');
 }
 
 // ---------- Render: PESSOAS ----------
@@ -658,8 +718,10 @@ function renderTopbar() {
 
 function atualizarMenuInstall() {
   const btn = $('#btn-install');
-  if (!btn) return;
-  btn.hidden = !pwa.isInstallable() || pwa.isInstalled();
+  if (btn) btn.hidden = !pwa.isInstallable() || pwa.isInstalled();
+  if ($('#view-home').classList.contains('active') && state.conversaAtual) {
+    renderHome();
+  }
 }
 
 function bindModalMenu() {
@@ -836,6 +898,7 @@ async function main() {
   bindModalImportar();
   bindModalDefeito();
   bindModalMenu();
+  bindModalPeriodo();
 
   observer.observe($('#modal-importar'), { attributes: true, attributeFilter: ['class'] });
 }
