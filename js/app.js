@@ -801,6 +801,27 @@ function atualizarMenuInstall() {
   }
 }
 
+async function atualizarApp() {
+  const btn = $('#btn-atualizar');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Atualizando...';
+  }
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) {
+    console.warn('[app] erro ao limpar cache:', e);
+  }
+  window.location.reload();
+}
+
 function bindModalMenu() {
   $('#modal-menu [data-close]').onclick = () => closeModal('#modal-menu');
   $('#btn-logout').onclick = async () => {
@@ -811,6 +832,7 @@ function bindModalMenu() {
     await pwa.install();
     atualizarMenuInstall();
   };
+  $('#btn-atualizar').onclick = atualizarApp;
   pwa.onChange = atualizarMenuInstall;
 }
 
